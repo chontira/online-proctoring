@@ -32,11 +32,6 @@ def face_reg(rgb_small_frame):
         matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
         name = "Unknown"
 
-        # # If a match was found in known_face_encodings, just use the first one.
-        # if True in matches:
-        #     first_match_index = matches.index(True)
-        #     name = known_face_names[first_match_index]
-
         # Or instead, use the known face with the smallest distance to the new face
         face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
         best_match_index = np.argmin(face_distances)
@@ -62,13 +57,10 @@ def draw_face_reg(faces):
 
         # Draw a label with a name below the face
         cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
-        # font = cv2.FONT_HERSHEY_DUPLEX
         cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
     return frame
 
 def get_14_face_landmark(face_loc):
-    # for face_loc,name in faces:
-        # if name != 'Unknown':
     top, right, bottom, left = face_loc
     top *= 4 
     right *= 4
@@ -76,9 +68,7 @@ def get_14_face_landmark(face_loc):
     left *= 4
     face_location = (top-50, right+50, bottom+50, left-50)
     face_location = (top, right, bottom, left)
-    # face_img = img[top-50:bottom+50, left-50:right+50]
     face_landmarks = face_recognition.face_landmarks(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB),[face_location])
-    # face_landmarks = face_recognition.face_landmarks(cv2.cvtColor(face_img,cv2.COLOR_BGR2RGB))
     _14_points = np.array([
         face_landmarks[0]['left_eyebrow'][0],     # 17 left eyebrow left corner
         face_landmarks[0]['left_eyebrow'][4],     # 21 left eyebrow right corner
@@ -106,11 +96,10 @@ def head_pose(image_points):
     angles[0, 0] = angles[0, 0] * -1
     return round(angles[2, 0],2), round(angles[0, 0],2), round(angles[1, 0],2)  # roll, pitch, yaw
 
-def draw_head_pose(roll, pitch, yaw, head):
+def draw_head_pose(roll, pitch, yaw):
     text = 'roll: '+str(roll)+' pitch: '+str(pitch)+' yaw:'+str(yaw)
-    cv2.putText(frame, text, (75,75), font, 2, (128, 255, 255), 3) # draw yellow number (up,down)
-    cv2.putText(frame, head, (75,110), font, 2, (255, 255, 128), 3) # draw blue number (left,right)
-
+    cv2.putText(frame, text, (75,75), font, 2, (128, 255, 255), 3) 
+    
 disappear = False
 stranger = False
 head_leftright = False
@@ -345,22 +334,13 @@ while True:
     # process_this_frame = not process_this_frame
     for p in image_points:
         cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
-    head = ''
-    # if yaw > 3:
-    #     head=head+'right '
-    # elif yaw < -3: 
-    #     head=head+'left '
-    # if pitch > 10:
-    #     head=head+'up'
-    # elif pitch < -8:
-    #     head=head+'down'
     avg_pitch = round(average(pitch_list),2)
     avg_yaw = round(average(yaw_list),2)
     alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw, object_frame)
     # print(avg_pitch, pitch_list)
     # print(avg_yaw, yaw_list)
     draw_object_detection(boxes, scores, classes, LABELS)
-    draw_head_pose(roll, pitch, yaw, head)
+    draw_head_pose(roll, pitch, yaw)
     draw_face_reg(faces)
     cv2.imshow('Video', frame)
 
