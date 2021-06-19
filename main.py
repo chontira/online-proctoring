@@ -6,7 +6,10 @@ import math
 from datetime import datetime
 import os
 
-def encode_examer_img(img_path):
+def average(li):
+    return sum(li)/len(li)
+
+def encode_test_taker_img(img_path):
     image = face_recognition.load_image_file(img_path)
     face_locations = face_recognition.face_locations(image)
     face_encoding = face_recognition.face_encodings(image,face_locations)[0]
@@ -95,48 +98,6 @@ def get_14_face_landmark(face_loc):
     ], dtype="double")
     return _14_points
 
-# def draw_annotation_box(img, rotation_vector, translation_vector, camera_matrix, color=(255, 255, 0), line_width=2):
-#     """Draw a 3D box as annotation of pose"""
-#     point_3d = []
-#     dist_coeffs = np.zeros((4,1))
-#     rear_size = 1
-#     rear_depth = 0
-#     point_3d.append((-rear_size, -rear_size, rear_depth))
-#     point_3d.append((-rear_size, rear_size, rear_depth))
-#     point_3d.append((rear_size, rear_size, rear_depth))
-#     point_3d.append((rear_size, -rear_size, rear_depth))
-#     point_3d.append((-rear_size, -rear_size, rear_depth))
-
-#     front_size = img.shape[1]
-#     front_depth = front_size*2
-#     point_3d.append((-front_size, -front_size, front_depth))
-#     point_3d.append((-front_size, front_size, front_depth))
-#     point_3d.append((front_size, front_size, front_depth))
-#     point_3d.append((front_size, -front_size, front_depth))
-#     point_3d.append((-front_size, -front_size, front_depth))
-#     point_3d = np.array(point_3d, dtype=np.float).reshape(-1, 3)
-
-#     # Map to 2d img points
-#     (point_2d, _) = cv2.projectPoints(point_3d,
-#                                       rotation_vector,
-#                                       translation_vector,
-#                                       camera_matrix,
-#                                       dist_coeffs)
-#     point_2d = np.int32(point_2d.reshape(-1, 2))
-    
-
-#     # # Draw all the lines
-#     # cv2.polylines(img, [point_2d], True, color, line_width, cv2.LINE_AA)
-#     k = (point_2d[5] + point_2d[8])//2
-#     # cv2.line(img, tuple(point_2d[1]), tuple(
-#     #     point_2d[6]), color, line_width, cv2.LINE_AA)
-#     # cv2.line(img, tuple(point_2d[2]), tuple(
-#     #     point_2d[7]), color, line_width, cv2.LINE_AA)
-#     # cv2.line(img, tuple(point_2d[3]), tuple(
-#     #     point_2d[8]), color, line_width, cv2.LINE_AA)
-    
-#     return(point_2d[2], k)
-
 def head_pose(image_points):
     dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
     (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
@@ -144,25 +105,31 @@ def head_pose(image_points):
     pose_mat = cv2.hconcat((rotation_mat, translation_vector))
     _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
     angles[0, 0] = angles[0, 0] * -1
-    return round(angles[1, 0],2), round(angles[0, 0],2), round(angles[2, 0],2)  # roll, pitch, yaw
+    return round(angles[2, 0],2), round(angles[0, 0],2), round(angles[1, 0],2)  # roll, pitch, yaw
 
-def draw_head_pose(pitch, yaw, head):
-    text = 'pitch: '+str(pitch)+' yaw:'+str(yaw)
+def draw_head_pose(roll, pitch, yaw, head):
+    text = 'roll: '+str(roll)+' pitch: '+str(pitch)+' yaw:'+str(yaw)
     cv2.putText(frame, text, (75,75), font, 2, (128, 255, 255), 3) # draw yellow number (up,down)
     cv2.putText(frame, head, (75,110), font, 2, (255, 255, 128), 3) # draw blue number (left,right)
 
 disappear = False
 stranger = False
-def alert(disappear_frame,stranger_frame):
+head_leftright = False
+head_down = False
+def alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw):
     global disappear
     global stranger
-    # alert examer disappear
+    global head_leftright
+    global head_down
+
+    # alert test_taker disappear
     if (disappear_frame == 10) & (disappear == False):
         disappear = True
         print(datetime.now().strftime("%H:%M:%S")+' disappear')
     elif (disappear_frame == 0) & (disappear == True):
         disappear = False
         print(datetime.now().strftime("%H:%M:%S")+' appear')
+
     # alert found stranger
     if (stranger_frame == 10) & (stranger==False):
         stranger = True
@@ -170,9 +137,28 @@ def alert(disappear_frame,stranger_frame):
     elif (stranger_frame == 0) & (stranger == True):
         stranger = False
         print(datetime.now().strftime("%H:%M:%S")+' stranger disappear')
+    
+    # alert head down
+    if (avg_pitch < -8) & (head_down == False):
+        head_down = True
+        print(datetime.now().strftime("%H:%M:%S")+' head down')
+    elif (avg_pitch > -8) & (head_down == True):
+        head_down = False
+        print(datetime.now().strftime("%H:%M:%S")+' head stright')
+    
+    # alert head turn left or right
+    if (avg_yaw < -25) & (head_leftright == False):
+        head_leftright = True
+        print(datetime.now().strftime("%H:%M:%S")+' head left')
+    elif (avg_yaw > 25) & (head_leftright == False):
+        head_leftright = True
+        print(datetime.now().strftime("%H:%M:%S")+' head right')
+    elif (avg_yaw > -25) & (avg_yaw < 25) & (head_leftright == True):
+        head_leftright = False
+        print(datetime.now().strftime("%H:%M:%S")+' head stright')
 
-def get_examer_img(id):
-    for fname in os.listdir('examer'): 
+def get_test_taker_img(id):
+    for fname in os.listdir('test_taker_img'): 
         if id in fname:
             return fname
 
@@ -275,13 +261,16 @@ stranger_cnt = 0
 stranger_frame = 0
 conf = 0.5
 thres = 0.3
+yaw_list = []
+pitch_list = []
 
-# load examer image and encode
-stu_id = input('Enter your student ID: ')
-examer_fname = get_examer_img(stu_id)
-examer_face_encoding = encode_examer_img('examer/'+examer_fname)
-known_face_encodings = [examer_face_encoding]
-known_face_names = [examer_fname.split('.')[0]]
+# load test taker img image and encode
+# stu_id = input('Enter your student ID: ')
+stu_id = '6210412009'
+test_taker_fname = get_test_taker_img(stu_id)
+test_taker_face_encoding = encode_test_taker_img('test_taker_img/'+test_taker_fname)
+known_face_encodings = [test_taker_face_encoding]
+known_face_names = [test_taker_fname.split('.')[0]]
 
 # load YOLO from disk
 LABELS,COLORS,net = load_object_detection()
@@ -325,6 +314,11 @@ while True:
         if name != 'Unknown':
             image_points = get_14_face_landmark(face_loc)
             roll, pitch, yaw = head_pose(image_points)
+            yaw_list.append(yaw)
+            pitch_list.append(pitch)
+            if len(yaw_list) > 10:
+                del yaw_list[0]
+                del pitch_list[0]
             disappear_frame = 0
             stranger_cnt -= 1
     if stranger_cnt > 0:
@@ -335,19 +329,21 @@ while True:
     for p in image_points:
         cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
     head = ''
-    if yaw > 3:
-        head=head+'right '
-    elif yaw < -3: 
-        head=head+'left '
-    if pitch > 10:
-        head=head+'up'
-    elif pitch < 1:
-        head=head+'down'
-    
-    alert(disappear_frame,stranger_frame)
-    # print(stranger_cnt)
+    # if yaw > 3:
+    #     head=head+'right '
+    # elif yaw < -3: 
+    #     head=head+'left '
+    # if pitch > 10:
+    #     head=head+'up'
+    # elif pitch < -8:
+    #     head=head+'down'
+    avg_pitch = round(average(pitch_list),2)
+    avg_yaw = round(average(yaw_list),2)
+    alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw)
+    # print(avg_pitch, pitch_list)
+    # print(avg_yaw, yaw_list)
     draw_object_detection(boxes, scores, classes, LABELS)
-    draw_head_pose(pitch, yaw, head)
+    draw_head_pose(roll, pitch, yaw, head)
     draw_face_reg(faces)
     cv2.imshow('Video', frame)
 
@@ -357,4 +353,3 @@ while True:
 # Release handle to the webcam
 cap.release()
 cv2.destroyAllWindows()
-print(face_loc)
