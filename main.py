@@ -42,7 +42,6 @@ def face_reg(rgb_small_frame):
         best_match_index = np.argmin(face_distances)
         if matches[best_match_index]:
             name = known_face_names[best_match_index]
-
         face.append([face_locations[i],name])
     return face
 
@@ -116,7 +115,8 @@ disappear = False
 stranger = False
 head_leftright = False
 head_down = False
-def alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw):
+object_detect = [False,False,False]
+def alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw, object_frame):
     global disappear
     global stranger
     global head_leftright
@@ -156,6 +156,15 @@ def alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw):
     elif (avg_yaw > -25) & (avg_yaw < 25) & (head_leftright == True):
         head_leftright = False
         print(datetime.now().strftime("%H:%M:%S")+' head stright')
+    
+    # alert found object
+    for i in range(3):
+        if (object_frame[i] == 10) & (object_detect[i]==False):
+            object_detect[i] = True
+            print(datetime.now().strftime("%H:%M:%S")+' found '+LABELS[i])
+        elif (object_frame[i] == 0) & (object_detect[i] == True):
+            object_detect[i] = False
+            print(datetime.now().strftime("%H:%M:%S")+' not found '+LABELS[i])
 
 def get_test_taker_img(id):
     for fname in os.listdir('test_taker_img'): 
@@ -244,15 +253,16 @@ def object_detection(frame):
 
 def draw_object_detection(boxes, confidences, classIDs, LABELS):
     for i in range(len(boxes)):
-        # extract the bounding box coordinates
-        (x, y) = (boxes[i][0], boxes[i][1])
-        (w, h) = (boxes[i][2], boxes[i][3])
-        
-        # draw a bounding box rectangle and label on the image
-        color = [int(c) for c in COLORS[classIDs[i]]]
-        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-        text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
-        cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,0.5, color, 2)
+        if classIDs[i] != 3:
+            # extract the bounding box coordinates
+            (x, y) = (boxes[i][0], boxes[i][1])
+            (w, h) = (boxes[i][2], boxes[i][3])
+            
+            # draw a bounding box rectangle and label on the image
+            color = [int(c) for c in COLORS[classIDs[i]]]
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
+            cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,0.5, color, 2)
 
 # Initialize some variables
 process_this_frame = True
@@ -263,10 +273,10 @@ conf = 0.5
 thres = 0.3
 yaw_list = []
 pitch_list = []
+object_frame =[0,0,0]
 
 # load test taker img image and encode
-# stu_id = input('Enter your student ID: ')
-stu_id = '6210412009'
+stu_id = input('Enter your student ID: ')
 test_taker_fname = get_test_taker_img(stu_id)
 test_taker_face_encoding = encode_test_taker_img('test_taker_img/'+test_taker_fname)
 known_face_encodings = [test_taker_face_encoding]
@@ -307,8 +317,15 @@ while True:
     
     # if process_this_frame:
     disappear_frame +=1
+    object_frame[0] +=1
+    object_frame[1] +=1
+    object_frame[2] +=1
+
     faces = face_reg(rgb_small_frame)
     boxes, scores, classes = object_detection(bgr_small_frame)
+    for c in np.arange(3):
+        if (not (c in classes)):
+            object_frame[c] = 0
     stranger_cnt = len(faces)
     for face_loc,name in faces:
         if name != 'Unknown':
@@ -339,7 +356,7 @@ while True:
     #     head=head+'down'
     avg_pitch = round(average(pitch_list),2)
     avg_yaw = round(average(yaw_list),2)
-    alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw)
+    alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw, object_frame)
     # print(avg_pitch, pitch_list)
     # print(avg_yaw, yaw_list)
     draw_object_detection(boxes, scores, classes, LABELS)
