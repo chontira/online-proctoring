@@ -96,9 +96,10 @@ def head_pose(image_points):
     angles[0, 0] = angles[0, 0] * -1
     return round(angles[2, 0],2), round(angles[0, 0],2), round(angles[1, 0],2)  # roll, pitch, yaw
 
-def draw_head_pose(roll, pitch, yaw):
+def draw_head_pose(roll, pitch, yaw, head):
     text = 'roll: '+str(roll)+' pitch: '+str(pitch)+' yaw:'+str(yaw)
     cv2.putText(frame, text, (75,75), font, 2, (128, 255, 255), 3) 
+    cv2.putText(frame, head, (75,125), font, 2, (255, 255, 128), 3) 
     
 disappear = False
 stranger = False
@@ -128,21 +129,21 @@ def alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw, object_frame):
         print(datetime.now().strftime("%H:%M:%S")+' stranger disappear')
     
     # alert head down
-    if (avg_pitch < -8) & (head_down == False):
+    if (avg_pitch < head_down_thres) & (head_down == False):
         head_down = True
         print(datetime.now().strftime("%H:%M:%S")+' head down')
-    elif (avg_pitch > -8) & (head_down == True):
+    elif (avg_pitch > head_down_thres) & (head_down == True):
         head_down = False
         print(datetime.now().strftime("%H:%M:%S")+' head stright')
     
     # alert head turn left or right
-    if (avg_yaw < -25) & (head_leftright == False):
+    if (avg_yaw < head_left_thres) & (head_leftright == False):
         head_leftright = True
         print(datetime.now().strftime("%H:%M:%S")+' head left')
-    elif (avg_yaw > 25) & (head_leftright == False):
+    elif (avg_yaw > head_right_thres) & (head_leftright == False):
         head_leftright = True
         print(datetime.now().strftime("%H:%M:%S")+' head right')
-    elif (avg_yaw > -25) & (avg_yaw < 25) & (head_leftright == True):
+    elif (avg_yaw > head_left_thres) & (avg_yaw < head_right_thres) & (head_leftright == True):
         head_leftright = False
         print(datetime.now().strftime("%H:%M:%S")+' head stright')
     
@@ -264,6 +265,11 @@ yaw_list = []
 pitch_list = []
 object_frame =[0,0,0]
 
+#headpose threshold
+head_down_thres = -15
+head_left_thres = -30
+head_right_thres = 30
+
 # load test taker img image and encode
 stu_id = input('Enter your student ID: ')
 test_taker_fname = get_test_taker_img(stu_id)
@@ -334,13 +340,22 @@ while True:
     # process_this_frame = not process_this_frame
     for p in image_points:
         cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
+
+    head = ''
+    if yaw > head_right_thres:
+        head=head+'right '
+    elif yaw < head_left_thres: 
+        head=head+'left '
+    elif pitch < head_down_thres:
+        head=head+'down'
+
     avg_pitch = round(average(pitch_list),2)
     avg_yaw = round(average(yaw_list),2)
     alert(disappear_frame,stranger_frame, avg_pitch, avg_yaw, object_frame)
     # print(avg_pitch, pitch_list)
     # print(avg_yaw, yaw_list)
     draw_object_detection(boxes, scores, classes, LABELS)
-    draw_head_pose(roll, pitch, yaw)
+    draw_head_pose(roll, pitch, yaw, head)
     draw_face_reg(faces)
     cv2.imshow('Video', frame)
 
